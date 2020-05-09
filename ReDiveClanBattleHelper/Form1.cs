@@ -16,13 +16,15 @@ namespace ReDiveClanBattleHelper
     {
         //^(2020-05-08 [0-5]+:[0-9]{2}:[0-9]{2})|(2020-05-07 [5-9]+:[0-9]{2}:[0-9]{2})|(^2020-05-07 [1-2]*[0-9]+:[0-9]{2}:[0-9]{2})
         static private bool Debug = false;
+        static private Regex reg = new Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2} [1-2]{0,1}[0-9]:[0-6][0-9]:[0-6][0-9] (.*)((\\([0-9]{5,12}\\))|(<(.*)>))$");
         static private Regex reg1 = new Regex("^(2020-05-08 [0-5]+:[0-9]{2}:[0-9]{2})|(2020-05-07 [5-9]+:[0-9]{2}:[0-9]{2})|(^2020-05-07 [1-2]*[0-9]+:[0-9]{2}:[0-9]{2}) (.*)((\\([0-9]{5,12}\\))|(<(.*)>))$");
-        static private Regex reg2 = new Regex("^(完成 [0-9]{1,7})|(完成 击杀)$");
+        static private Regex reg2 = new Regex("^((完成)|(强行下树) [0-9]{1,7})|(完成 击杀)$");
         static private Regex regTime = new Regex("^(2020-05-08 [0-5]+:[0-9]{2}:[0-9]{2})|(2020-05-07 [5-9]+:[0-9]{2}:[0-9]{2})|(^2020-05-07 [1-2]*[0-9]+:[0-9]{2}:[0-9]{2})");
         static private Regex regName = new Regex(":[0-9]{2} (.*)((\\()|(<))");
         static private Regex regQQ = new Regex("(\\([0-9]{5,12}\\))|(<(.*)>)$");
         static private Regex regDmg = new Regex("([0-9]{1,7})|(击杀)");
 
+        private Dictionary<string, string> nameList = new Dictionary<string, string>();
         private string filePath = "";
         private string defaultPath = @"E:\工会战\default.txt";
 
@@ -35,9 +37,98 @@ namespace ReDiveClanBattleHelper
             return -1;
         }
 
+        private void GetNameList()
+        {
+            nameList = new Dictionary<string, string>();
+            string line = "", name = "", qq = "";
+
+            System.IO.StreamReader file = new System.IO.StreamReader(filePath);
+
+            while ((line = file.ReadLine()) != null)
+            {
+                if (reg.IsMatch(line))
+                {
+                    name = regName.Match(line).ToString();
+                    name = name.Substring(4, name.Length - 5);
+                    qq = regQQ.Match(line).ToString();
+                    qq = qq.Substring(1, qq.Length - 2);
+                    if (nameList.ContainsKey(qq))
+                        nameList[qq] = name;
+                    else
+                        nameList.Add(qq, name);
+                }
+            }
+            file.Close();
+        }
+
+        private void FillBlank(DataGridView dataGridView)
+        {
+            int row = dataGridView.Rows.Count;
+            int col = dataGridView.Columns.Count;
+            for (int i = 0; i < row - 1; i++)//得到总行数并在之内循环
+                nameList.Remove(dataGridView.Rows[i].Cells[1].Value.ToString());
+            nameList.Remove("1000000");
+            nameList.Remove("80000000");
+            nameList.Remove("3386746424");
+            nameList.Remove("10000");
+            nameList.Remove("b@uid75.com");
+            nameList.Remove("353211705");
+            nameList.Remove("2948127973");
+            nameList.Remove("190482951");
+            nameList.Remove("1421447421");
+            nameList.Remove("1339503382");
+            nameList.Remove("365383062");
+            foreach (KeyValuePair<string, string> p in nameList)
+            {
+                DataGridViewRow r = new DataGridViewRow();
+                int index = dataGridView1.Rows.Add(r);
+                dataGridView1.Rows[index].Cells[0].Value = index + 1;
+                dataGridView1.Rows[index].Cells[1].Value = p.Key;
+                dataGridView1.Rows[index].Cells[2].Value = p.Value;
+                dataGridView1.Rows[index].Cells[3].Value = 0;
+            }
+        }
+
+        private void Judge(DataGridView dataGridView)
+        {
+            int row = dataGridView.Rows.Count;
+            int col = dataGridView.Columns.Count;
+            for (int i = 0; i < row - 1; i++)//得到总行数并在之内循环
+            {
+                bool first = false, second = false, third = false, free = false;
+                int count= Int32.Parse( dataGridView.Rows[i].Cells[3].Value.ToString());
+                for(int j = 0; j < count; j++)
+                {
+                    int dmg =Int32.Parse( dataGridView.Rows[i].Cells[j*2+6].Value.ToString());
+                    if (dmg <= 0)
+                        continue;
+                    else if (dmg < 400000)
+                        free = true;
+                    else if (dmg < 550000)
+                        third = true;
+                    else if (dmg < 700000)
+                        second = true;
+                    else
+                        first = true;
+                }
+                string judge = "";
+                if (first)
+                    judge += "妈刀+";
+                if (second)
+                    judge += "充电狼+";
+                if (third)
+                    judge += "弟弟刀+";
+                if (free)
+                    judge += "补偿刀+";
+                judge = judge.Substring(0, judge.Length - 1);
+                dataGridView.Rows[i].Cells[4].Value = judge;
+            }
+        }
+
         private void Execute()
         {
             dataGridView1.Rows.Clear();
+            GetNameList();
             int counter = 0;
             string line = "", name = "", qq = "";
             int damage = 0;
@@ -69,37 +160,11 @@ namespace ReDiveClanBattleHelper
                         if (rowIndex >= 0)
                         {
                             row = dataGridView1.Rows[rowIndex];
-                            switch (row.Cells[3].Value)
-                            {
-                                case 1:
-                                    row.Cells[7].Value = sdmg;
-                                    row.Cells[8].Value = time.ToString("T");
-                                    row.Cells[4].Value = (int)row.Cells[4].Value + damage;
-                                    break;
-                                case 2:
-                                    row.Cells[9].Value = sdmg;
-                                    row.Cells[10].Value = time.ToString("T");
-                                    row.Cells[4].Value = (int)row.Cells[4].Value + damage;
-                                    break;
-                                case 3:
-                                    row.Cells[11].Value = sdmg;
-                                    row.Cells[12].Value = time.ToString("T");
-                                    row.Cells[4].Value = (int)row.Cells[4].Value + damage;
-                                    break;
-                                case 4:
-                                    row.Cells[13].Value = sdmg;
-                                    row.Cells[14].Value = time.ToString("T");
-                                    row.Cells[4].Value = (int)row.Cells[4].Value + damage;
-                                    break;
-                                case 5:
-                                    row.Cells[15].Value = sdmg;
-                                    row.Cells[16].Value = time.ToString("T");
-                                    row.Cells[4].Value = (int)row.Cells[4].Value + damage;
-                                    break;
-                                default:
-                                    break;
-                            }
+                            int index = (int)row.Cells[3].Value;
+                            row.Cells[index * 2 + 6].Value = sdmg;
+                            row.Cells[index * 2 + 7].Value = time.ToString("T");
                             row.Cells[3].Value = (int)row.Cells[3].Value + 1;
+                            row.Cells[5].Value = (int)row.Cells[5].Value + damage;
                         }
                         else
                         {
@@ -109,9 +174,9 @@ namespace ReDiveClanBattleHelper
                             dataGridView1.Rows[index].Cells[1].Value = qq;
                             dataGridView1.Rows[index].Cells[2].Value = name;
                             dataGridView1.Rows[index].Cells[3].Value = 1;
-                            dataGridView1.Rows[index].Cells[4].Value = damage;
-                            dataGridView1.Rows[index].Cells[5].Value = sdmg;
-                            dataGridView1.Rows[index].Cells[6].Value = time.ToString("T");
+                            dataGridView1.Rows[index].Cells[5].Value = damage;
+                            dataGridView1.Rows[index].Cells[6].Value = sdmg;
+                            dataGridView1.Rows[index].Cells[7].Value = time.ToString("T");
                         }
                         row = null;
                     }
@@ -136,6 +201,8 @@ namespace ReDiveClanBattleHelper
             }
 
             file.Close();
+            Judge(dataGridView1);
+            FillBlank(dataGridView1);
             Log(counter);
         }
 
@@ -170,24 +237,26 @@ namespace ReDiveClanBattleHelper
             DataGridViewTextBoxColumn col14 = new DataGridViewTextBoxColumn();
             DataGridViewTextBoxColumn col15 = new DataGridViewTextBoxColumn();
             DataGridViewTextBoxColumn col16 = new DataGridViewTextBoxColumn();
+            DataGridViewTextBoxColumn col17 = new DataGridViewTextBoxColumn();
 
             col.HeaderText = "序号";
             col1.HeaderText = "QQ号";
             col2.HeaderText = "出刀人";
             col3.HeaderText = "出刀数";
-            col4.HeaderText = "总伤害";
-            col5.HeaderText = "第一刀伤害";
-            col6.HeaderText = "第一刀时间";
-            col7.HeaderText = "第二刀伤害";
-            col8.HeaderText = "第二刀时间";
-            col9.HeaderText = "第三刀伤害";
-            col10.HeaderText = "第三刀时间";
-            col11.HeaderText = "第四刀伤害";
-            col12.HeaderText = "第四刀时间";
-            col13.HeaderText = "第五刀伤害";
-            col14.HeaderText = "第五刀时间";
-            col15.HeaderText = "第六刀伤害";
-            col16.HeaderText = "第六刀时间";
+            col4.HeaderText = "智能识别出刀类型";
+            col5.HeaderText = "总伤害";
+            col6.HeaderText = "第一刀伤害";
+            col7.HeaderText = "第一刀时间";
+            col8.HeaderText = "第二刀伤害";
+            col9.HeaderText = "第二刀时间";
+            col10.HeaderText = "第三刀伤害";
+            col11.HeaderText = "第三刀时间";
+            col12.HeaderText = "第四刀伤害";
+            col13.HeaderText = "第四刀时间";
+            col14.HeaderText = "第五刀伤害";
+            col15.HeaderText = "第五刀时间";
+            col16.HeaderText = "第六刀伤害";
+            col17.HeaderText = "第六刀时间";
 
             dataGridView1.Columns.Add(col);
             dataGridView1.Columns.Add(col1);
@@ -206,6 +275,7 @@ namespace ReDiveClanBattleHelper
             dataGridView1.Columns.Add(col14);
             dataGridView1.Columns.Add(col15);
             dataGridView1.Columns.Add(col16);
+            dataGridView1.Columns.Add(col17);
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -246,7 +316,7 @@ namespace ReDiveClanBattleHelper
                 {
                     MessageBox.Show("请先导入聊天记录");
                     return;
-                    
+
                 }
                 filePath = defaultPath;
             }
@@ -276,7 +346,7 @@ namespace ReDiveClanBattleHelper
         private void ExportToCsv(DataGridView dataGridView, string fp)
         {
             StreamWriter sw = new StreamWriter(fp, false, System.Text.Encoding.Default);
-            
+
             int row = dataGridView.Rows.Count;
             int col = dataGridView.Columns.Count;
 
@@ -310,6 +380,24 @@ namespace ReDiveClanBattleHelper
                 catch (Exception ex)
                 {
                     MessageBox.Show("导出失败\n\r" + ex.Message);
+                }
+            }
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            string target=comboBox1.SelectedItem.ToString();
+            int row = dataGridView1.Rows.Count;
+            int col = dataGridView1.Columns.Count;
+            for (int i = 0; i < row - 1; i++)//得到总行数并在之内循环
+            {
+                object temp = dataGridView1.Rows[i].Cells[4].Value;
+                if (null == temp)
+                    continue;
+                if (temp.ToString().Contains(target))
+                {
+                    dataGridView1.Rows.Remove(dataGridView1.Rows[i--]);
+                    row--;
                 }
             }
         }
